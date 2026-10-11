@@ -53,8 +53,18 @@ jobs:
       - name: Install dependencies
         run: |
           npm ci
+
+      - name: Build schema
+        run: |
           npm run build:schema
+          # Ensure schemas are compiled in dist/
+          find ./dist/schemas -name "*.compiled" -type f -delete 2>/dev/null || true
+
+      - name: Build resources
+        run: |
           npm run build:resources
+          # Ensure resources are compiled in dist/
+          find ./dist -name "*.gresource" -type f -delete 2>/dev/null || true
 
       - name: Build main package
         run: |
