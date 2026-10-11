@@ -3,83 +3,61 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'  # Triggers on tags like v17.3, 17.4, etc.
+      - 'v*'  # Triggers on tags like v17.3, v17.4, etc.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag name to release (e.g., v17.4)'
-        required: false
-        default: 'latest'
+        description: 'Existing tag to release (e.g., v17.4)'
+        required: true
 
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+permissions:
+  contents: write  # Required for creating releases
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Required for creating releases
+    env:
+      # Tag push: the pushed tag. Manual run: the tag typed into the input.
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
-          cache-key: 'npm-${{ hashFiles('package-lock.json') }}'
-          always-auth: true
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install GNOME development tools
         timeout-minutes: 10
         run: |
           sudo apt-get update -qq
-          # Install core GNOME development tools
+          # glib-compile-resources lives in libglib2.0-dev-bin,
+          # glib-compile-schemas in libglib2.0-bin
           sudo apt-get install -y --no-install-recommends \
-            libgirepository1.0-dev \
-            libglib2.0-dev \
-            glib2.0-utils \
-            glib-networking \
-            glib-networking-bin \
-            glib-compile-resources \
-            glib-compile-schemas
-          # Verify installation
-          echo "Checking for required tools..."
-          which glib-compile-resources || echo "ERROR: glib-compile-resources not found"
-          which glib-compile-schemas || echo "ERROR: glib-compile-schemas not found"
+            libglib2.0-dev-bin \
+            libglib2.0-bin
+          # Fail the step if either tool is missing
+          command -v glib-compile-resources
+          command -v glib-compile-schemas
 
       - name: Install dependencies
-        run: |
-          npm ci
+        run: npm ci
 
-      - name: Build schema
-        run: |
-          npm run build:schema
-          # Ensure schemas are compiled in dist/
-          find ./dist/schemas -name "*.compiled" -type f -delete 2>/dev/null || true
+      # `npm run build` cleans, bundles, compiles schemas and resources, and
+      # generates both dist/ (GNOME 45+) and dist_legacy/ (GNOME 42-44)
+      - name: Build
+        run: npm run build
 
-      - name: Build resources
+      - name: Package
         run: |
-          npm run build:resources
-          # Ensure resources are compiled in dist/
-          find ./dist -name "*.gresource" -type f -delete 2>/dev/null || true
-
-      - name: Build main package
-        run: |
-          npm run build
-          # Create zip of main build
-          cd dist && zip -qr ../tilingshell-main.zip *
-          cd ..
-
-      - name: Build legacy package
-        run: |
-          # Copy main build to legacy
-          cp -r dist dist_legacy
-          cd dist_legacy
-          zip -qr ../tilingshell-legacy.zip *
-          cd ..
+          test -f dist/resources.gresource
+          test -f dist_legacy/resources.gresource
+          (cd dist && zip -qr ../tilingshell-main.zip .)
+          (cd dist_legacy && zip -qr ../tilingshell-legacy.zip .)
 
       - name: Upload main package artifact
         uses: actions/upload-artifact@v4
@@ -95,35 +73,11 @@ jobs:
           path: tilingshell-legacy.zip
           retention-days: 7
 
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          body: |
-            ${{ github.event.release.body }}
-
-      - name: Upload main package as release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tilingshell-main.zip
-          asset_name: tilingshell-main.zip
-          content_type: application/zip
-
-      - name: Upload legacy package as release asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: tilingshell-legacy.zip
-          asset_name: tilingshell-legacy.zip
-          content_type: application/zip
+          tag_name: ${{ env.TAG }}
+          generate_release_notes: true
+          files: |
+            tilingshell-main.zip
+            tilingshell-legacy.zip
