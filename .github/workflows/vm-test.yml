@@ -1,0 +1,53 @@
+name: VM Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      gnome_version:
+        description: 'GNOME version to test'
+        required: true
+        type: choice
+        options:
+          - 'gnome46'
+          - 'gnome47'
+          - 'gnome49'
+        default: 'gnome47'
+
+jobs:
+  vm-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Vagrant
+        uses: macacdev/setup-vagrant@v1
+
+      - name: Sync and start VM
+        run: |
+          vagrant destroy ${{ github.event.inputs.gnome_version || 'gnome47' }} || true
+          vagrant up ${{ github.event.inputs.gnome_version || 'gnome47' }}
+
+      - name: Build extension
+        run: |
+          npm run build
+
+      - name: Install extension on VM
+        run: |
+          vagrant rsync
+          vagrant ssh -c "
+            sudo mkdir -p ~/.local/share/gnome-shell/extensions/tilingshell@ferrarodomenico.com
+            sudo cp -r tilingshell/dist/* ~/.local/share/gnome-shell/extensions/tilingshell@ferrarodomenico.com/
+            echo 'Extension installed'
+          "
+
+      - name: Verify extension on VM
+        run: |
+          vagrant ssh -c "
+            ls -la ~/.local/share/gnome-shell/extensions/tilingshell@ferrarodomenico.com/
+            echo 'Extension files verified'
+          "

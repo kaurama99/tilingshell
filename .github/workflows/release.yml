@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v17.3, 17.3, etc.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to release (e.g., v17.3)'
+        required: false
+        default: 'latest'
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for creating releases
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run build:schema
+          npm run build:resources
+
+      - name: Build main package
+        run: |
+          npm run build
+          # Create zip of main build
+          cd dist && zip -qr ../tilingshell-main.zip *
+          cd ..
+
+      - name: Build legacy package
+        run: |
+          # Copy main build to legacy
+          cp -r dist dist_legacy
+          cd dist_legacy
+          zip -qr ../tilingshell-legacy.zip *
+          cd ..
+
+      - name: Upload main package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilingshell-main
+          path: tilingshell-main.zip
+          retention-days: 7
+
+      - name: Upload legacy package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilingshell-legacy
+          path: tilingshell-legacy.zip
+          retention-days: 7
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            ${{ github.event.release.body }}
+
+      - name: Upload main package as release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tilingshell-main.zip
+          asset_name: tilingshell-main.zip
+          content_type: application/zip
+
+      - name: Upload legacy package as release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: tilingshell-legacy.zip
+          asset_name: tilingshell-legacy.zip
+          content_type: application/zip
