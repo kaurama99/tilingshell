@@ -59,7 +59,7 @@ jobs:
 
       - name: Run linting
         run: |
-          npm run lint
+          npx eslint src
           npm run prettier:check
 
       - name: Run Shexli verification
