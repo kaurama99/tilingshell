@@ -24,6 +24,13 @@ jobs:
         run: |
           npm ci
 
+      - name: Install GLib tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libglib2.0-dev-bin
+          # Verify installation
+          which glib-compile-resources && which glib-compile-schemas
+
       - name: Run build
         run: |
           npm run build
