@@ -35,14 +35,18 @@ jobs:
         timeout-minutes: 10
         run: |
           sudo apt-get update -qq
-          # glib-compile-resources lives in libglib2.0-dev-bin,
-          # glib-compile-schemas in libglib2.0-bin
-          sudo apt-get install -y --no-install-recommends \
-            libglib2.0-dev-bin \
-            libglib2.0-bin
-          # Fail the step if either tool is missing
-          command -v glib-compile-resources
-          command -v glib-compile-schemas
+          # On Ubuntu 24.04:
+          # - libglib2.0-dev provides development headers
+          # - libglib2.0-bin provides glib-compile-resources and glib-compile-schemas
+          sudo apt-get install -y \
+            libgirepository1.0-dev \
+            libglib2.0-dev \
+            libglib2.0-bin \
+            glib-networking \
+            glib-networking-bin
+          # Verify installation
+          which glib-compile-resources && echo "✓ glib-compile-resources found"
+          which glib-compile-schemas && echo "✓ glib-compile-schemas found"
 
       - name: Install dependencies
         run: npm ci
