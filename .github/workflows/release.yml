@@ -36,15 +36,19 @@ jobs:
         timeout-minutes: 10
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y \
+          # Install core GNOME development tools
+          sudo apt-get install -y --no-install-recommends \
             libgirepository1.0-dev \
             libglib2.0-dev \
+            glib2.0-utils \
             glib-networking \
             glib-networking-bin \
             glib-compile-resources \
             glib-compile-schemas
           # Verify installation
-          which glib-compile-resources && which glib-compile-schemas
+          echo "Checking for required tools..."
+          which glib-compile-resources || echo "ERROR: glib-compile-resources not found"
+          which glib-compile-schemas || echo "ERROR: glib-compile-schemas not found"
 
       - name: Install dependencies
         run: |
