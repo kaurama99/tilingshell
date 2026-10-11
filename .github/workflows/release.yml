@@ -34,9 +34,16 @@ jobs:
 
       - name: Install GNOME development tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgirepository1.0-dev libglib2.0-0-dev \
-            glib-networking libglib2.0-bin glib-networking-bin
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgirepository1.0-dev \
+            libglib2.0-dev \
+            glib-networking \
+            glib-networking-bin \
+            glib-compile-resources \
+            glib-compile-schemas
+          # Verify installation
+          which glib-compile-resources && which glib-compile-schemas
 
       - name: Install dependencies
         run: |
