@@ -33,9 +33,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install GNOME development tools
+        timeout-minutes: 10
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get install -y \
             libgirepository1.0-dev \
             libglib2.0-dev \
             glib-networking \
