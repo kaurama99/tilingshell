@@ -28,6 +28,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-key: 'npm-${{ hashFiles('package-lock.json') }}'
           always-auth: true
           registry-url: 'https://registry.npmjs.org'
 
